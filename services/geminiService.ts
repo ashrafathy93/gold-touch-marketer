@@ -1,41 +1,30 @@
-import { GoogleGenAI } from '@google/genai';
+// هذا الملف لا يحتوي على أي مفتاح API — الاتصال بـ Gemini يتم فقط من داخل
+// api/generate.ts على السيرفر. هذا يمنع تسريب المفتاح للمتصفح.
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
-const ai = new GoogleGenAI({ apiKey });
-
-export async function generateShoppingImage(
-  base64Image: string,
-  prompt: string
-) {
+export async function generateShoppingImage(base64Image: string, prompt: string) {
   try {
-    const cleanBase64 = (base64Image || '')
-      .replace(/^data:image\/\w+;base64,/, '');
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-Flash-Lite-image',
-
-      contents: [
-        {
-          inlineData: {
-            data: cleanBase64,
-            mimeType: 'image/jpeg'
-          }
-        },
-        {
-          text: prompt
-        }
-      ],
-
-      config: {
-        responseModalities: ['IMAGE']
-      }
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'generate',
+        imageBase64: base64Image,
+        mimeType: 'image/jpeg',
+        prompt,
+      }),
     });
 
-    console.log('Gemini Response:', response);
+    const data = await response.json();
 
-    return response;
+    if (!response.ok) {
+      throw new Error(data.error || 'فشل الاتصال بالسيرفر أو تم استهلاك الحصة.');
+    }
 
+    console.log('Gemini Response:', data.result);
+
+    // نُعيد نفس شكل الاستجابة الذي يتوقعه App.tsx
+    // (response.candidates?.[0]?.content?.parts)
+    return data.result;
   } catch (error) {
     console.error('Gemini Error:', error);
     throw error;
