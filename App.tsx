@@ -53,11 +53,20 @@ const App: React.FC = () => {
         'قم بإنشاء وتصميم صورة تسويقية احترافية وجذابة لتصميم المجوهرات هذا مع إضاءة استوديو راقية.'
       );
       
-      const generated = response.text || (response as any).imageUrl || null;
-      
-      if (!generated) {
-        throw new Error('لم يتم استرجاع نتيجة صحيحة من النموذج.');
-      }
+      const parts = response.candidates?.[0]?.content?.parts || [];
+
+const imagePart = parts.find(
+  (part: any) => part.inlineData?.data
+);
+
+const generated = imagePart
+  ? `data:${imagePart.inlineData.mimeType || 'image/png'};base64,${imagePart.inlineData.data}`
+  : null;
+
+if (!generated) {
+  console.log('Full Gemini response:', response);
+  throw new Error('لم يتم العثور على صورة في استجابة النموذج.');
+}
 
       setResultImage(generated);
       
