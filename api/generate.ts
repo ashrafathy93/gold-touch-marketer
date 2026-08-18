@@ -64,21 +64,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ];
 
       try {
-        const primaryResponse = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-lite-image',
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
           contents,
           config: { responseModalities: ['IMAGE'] },
         });
-        return res.status(200).json({ result: primaryResponse });
-      } catch (primaryError) {
-        // التحويل للنموذج الاحتياطي في حال حدوث خطأ
-        console.error('Primary model failed, falling back:', primaryError);
-        const fallbackResponse = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-image',
-          contents,
-          config: { responseModalities: ['IMAGE'] },
+        return res.status(200).json({ result: response });
+      } catch (genError: any) {
+        console.error('Image generation failed:', genError);
+        return res.status(502).json({
+          error: genError.message || 'فشل توليد الصورة من Gemini.',
         });
-        return res.status(200).json({ result: fallbackResponse });
       }
     }
 
