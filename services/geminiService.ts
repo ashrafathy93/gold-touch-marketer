@@ -13,7 +13,7 @@ export async function generateShoppingImage(
       .replace(/^data:image\/\w+;base64,/, '');
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image',
+      model: 'gemini-3.1-Flash-Lite-image',
 
       contents: [
         {
