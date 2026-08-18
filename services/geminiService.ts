@@ -1,18 +1,23 @@
-export async function generateShoppingImage(imageBase64: string, onProgress: (msg: string) => void) {
-  onProgress('جاري الاتصال بالسيرفر الآمن...');
-  
-  const response = await fetch('/api/generate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ imageBase64 }),
-  });
+import { GoogleGenAI } from '@google/genai';
 
-  if (!response.ok) {
-    throw new Error('فشل الاتصال بالسيرفر أو تم استهلاك الحصة.');
+// قراءة المفتاح المخصص لـ Vite
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+const ai = new GoogleGenAI({ apiKey });
+
+export async function generateMarketingImage(base64Image: string, prompt: string) {
+  try {
+    // استخدام النموذج المتاح لتوليد الصور
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash', // أو الموديل الذي اختبرته بنجاح
+      contents: [
+        { inlineData: { data: base64Image, mimeType: 'image/jpeg' } },
+        prompt
+      ],
+    });
+    
+    return response;
+  } catch (error) {
+    console.error("Gemini Error:", error);
+    throw error;
   }
-
-  const data = await response.json();
-  return { resultImage: data.resultImage };
 }
