@@ -2,8 +2,8 @@ import { GoogleGenAI, Modality, Type, Part } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const ANALYSIS_MODEL = 'gemini-2.5-flash';
-const IMAGE_MODEL = 'gemini-2.5-flash-image';
+const ANALYSIS_MODEL = 'gemini-3.5-flash';
+const IMAGE_MODEL = 'gemini-3.1-flash-image';
 
 export interface ImageFile {
   data: string;
