@@ -20,8 +20,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { action, imageBase64, mimeType, prompt } = req.body || {};
 
-    const cleanBase64 = (imageBase64 || '').replace(/^data:image\/\w+;base64,/, '');
-    const resolvedMimeType = mimeType || 'image/jpeg';
+    // imageBase64 المفروض يكون نص (string). لو وصل بشكل غير متوقع (object,
+    // undefined، إلخ) بسبب اختلاف في fileToBase64 بالفرونت إند، نتعامل معه
+    // بأمان بدل ما نكسر السيرفر بخطأ "replace is not a function".
+    const rawBase64 =
+      typeof imageBase64 === 'string'
+        ? imageBase64
+        : imageBase64 && typeof imageBase64 === 'object' && typeof imageBase64.data === 'string'
+        ? imageBase64.data
+        : '';
+
+    if (imageBase64 && typeof rawBase64 !== 'string') {
+      return res.status(400).json({
+        error: `صيغة الصورة غير متوقعة من الفرونت إند (النوع المستلم: ${typeof imageBase64}).`,
+      });
+    }
+
+    const cleanBase64 = rawBase64.replace(/^data:image\/\w+;base64,/, '');
+    const resolvedMimeType =
+      mimeType || (imageBase64 && typeof imageBase64 === 'object' ? imageBase64.mimeType : null) || 'image/jpeg';
 
     // 1. تحليل/فهم الصورة (نص فقط)
     if (action === 'analyze') {
