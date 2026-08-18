@@ -18,9 +18,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loadingMessage, setLoadingMessage] = useState<string>('جاري التحليل...');
+  const [loadingMessage, setLoadingMessage] = useState<string>('جاري التحليل وتوليد الصورة...');
   
-  // استدعاء السجل من localStorage عند التحميل
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     const saved = localStorage.getItem('creativity_history');
     return saved ? JSON.parse(saved) : [];
@@ -28,7 +27,6 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [selectedImageForModal, setSelectedImageForModal] = useState<string | null>(null);
 
-  // حفظ السجل تلقائياً عند أي تغيير
   useEffect(() => {
     localStorage.setItem('creativity_history', JSON.stringify(history));
   }, [history]);
@@ -46,15 +44,28 @@ const App: React.FC = () => {
     if (!uploadedFile) return;
     setIsLoading(true);
     setError(null);
+    setLoadingMessage('جاري تحليل وتوليد الصورة التسويقية...');
+    
     try {
       const apiImage = await fileToBase64(uploadedFile);
-      const { resultImage: generated } = await generateShoppingImage(apiImage, setLoadingMessage);
+      const response = await generateShoppingImage(
+        apiImage, 
+        'قم بإنشاء وتصميم صورة تسويقية احترافية وجذابة لتصميم المجوهرات هذا مع إضاءة استوديو راقية.'
+      );
+      
+      const generated = response.text || (response as any).imageUrl || null;
+      
+      if (!generated) {
+        throw new Error('لم يتم استرجاع نتيجة صحيحة من النموذج.');
+      }
+
       setResultImage(generated);
+      
       if (imagePreview) {
         setHistory((prev) => [{ original: imagePreview, result: generated }, ...prev]);
       }
     } catch (err: any) {
-      setError(err.message || 'حدث خطأ غير متوقع.');
+      setError(err.message || 'حدث خطأ غير متوقع أثناء الاتصال بالذكاء الاصطناعي.');
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +104,6 @@ const App: React.FC = () => {
         <h1 className="text-4xl sm:text-5xl font-bold text-slate-800">creativity-🏹</h1>
       </header>
       <main className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* جزء الرفع والتوليد */}
         <div className="bg-white/70 backdrop-blur-md p-6 rounded-2xl border border-white/40 shadow-xl flex flex-col">
           <ImageUploader onImageUpload={handleImageUpload} imagePreview={imagePreview} onClearImage={() => setUploadedFile(null)} />
           <button onClick={handleGenerate} disabled={isLoading || !uploadedFile} className="mt-6 w-full flex items-center justify-center gap-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-400 text-white font-bold py-3 px-6 rounded-lg transition-all text-lg shadow-lg">
@@ -101,7 +111,6 @@ const App: React.FC = () => {
             <SparkleIcon className="w-5 h-5" />
           </button>
         </div>
-        {/* جزء النتيجة والسجل */}
         <div className="bg-white/70 backdrop-blur-md p-6 rounded-2xl border border-white/40 shadow-xl flex flex-col space-y-4">
           <GeneratedImageViewer isLoading={isLoading} resultImage={resultImage} error={error} loadingMessage={loadingMessage} onImageClick={(url) => { setSelectedImageForModal(url); setIsModalOpen(true); }} />
           {history.length > 0 && (
@@ -120,4 +129,5 @@ const App: React.FC = () => {
     </div>
   );
 };
+
 export default App;
