@@ -20,9 +20,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { action, imageBase64, mimeType, prompt } = req.body || {};
 
-    // imageBase64 المفروض يكون نص (string). لو وصل بشكل غير متوقع (object,
-    // undefined، إلخ) بسبب اختلاف في fileToBase64 بالفرونت إند، نتعامل معه
-    // بأمان بدل ما نكسر السيرفر بخطأ "replace is not a function".
     const rawBase64 =
       typeof imageBase64 === 'string'
         ? imageBase64
@@ -40,19 +37,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const resolvedMimeType =
       mimeType || (imageBase64 && typeof imageBase64 === 'object' ? imageBase64.mimeType : null) || 'image/jpeg';
 
-    // 1. تحليل/فهم الصورة (نص فقط)
+    // 1. تحليل وفحص الصورة (استخدام gemini-3.5-flash للتوفير والأداء العالي)
     if (action === 'analyze') {
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [
-          { inlineData: { data: cleanBase64, mimeType: resolvedMimeType } },
-          { text: prompt || 'قم بتحليل تصميم هذه المجوهرات واستخراج وصف دقيق.' },
-        ],
-      });
-      return res.status(200).json({ result: response.text });
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [
+            { inlineData: { data: cleanBase64, mimeType: resolvedMimeType } },
+            { text: prompt || 'قم بتحليل تصميم هذه المجوهرات واستخراج وصف دقيق.' },
+          ],
+        });
+        return res.status(200).json({ result: response.text });
+      } catch (analyzeError: any) {
+        // نموذج احتياطي في حالة حدوث إجهاد للكوتا (Fallback)
+        const fallbackResponse = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [
+            { inlineData: { data: cleanBase64, mimeType: resolvedMimeType } },
+            { text: prompt || 'قم بتحليل تصميم هذه المجوهرات واستخراج وصف دقيق.' },
+          ],
+        });
+        return res.status(200).json({ result: fallbackResponse.text });
+      }
     }
 
-    // 2. توليد صورة تسويقية من الصورة المرفوعة، مع نموذج احتياطي عند الفشل
+    // 2. توليد صورة تسويقية (استخدام gemini-3.1-flash-image "Nano Banana 2")
     if (action === 'generate') {
       if (!cleanBase64) {
         return res.status(400).json({ error: 'لم يتم إرسال صورة (imageBase64 مفقود).' });
@@ -65,16 +74,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: 'gemini-3.1-flash-image',
           contents,
           config: { responseModalities: ['IMAGE'] },
         });
         return res.status(200).json({ result: response });
       } catch (genError: any) {
-        console.error('Image generation failed:', genError);
-        return res.status(502).json({
-          error: genError.message || 'فشل توليد الصورة من Gemini.',
-        });
+        console.error('Image generation failed with gemini-3.1-flash-image, retrying with 2.5:', genError);
+        try {
+          // نموذج احتياطي لتوليد الصور
+          const fallbackGenResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents,
+            config: { responseModalities: ['IMAGE'] },
+          });
+          return res.status(200).json({ result: fallbackGenResponse });
+        } catch (fallbackError: any) {
+          return res.status(502).json({
+            error: fallbackError.message || 'فشل توليد الصورة من Gemini.',
+          });
+        }
       }
     }
 
