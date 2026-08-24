@@ -5,15 +5,13 @@ const apiKey = process.env.GEMINI_API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // السماح بطلبات POST فقط
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   if (!apiKey) {
     return res.status(500).json({
-      error:
-        'GEMINI_API_KEY غير معرف في Vercel. أضفه من Settings → Environment Variables ثم أعد النشر (Redeploy).',
+      error: 'GEMINI_API_KEY غير معرف في إعدادات المنصة. تأكد من إضافته.',
     });
   }
 
@@ -29,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (imageBase64 && typeof rawBase64 !== 'string') {
       return res.status(400).json({
-        error: `صيغة الصورة غير متوقعة من الفرونت إند (النوع المستلم: ${typeof imageBase64}).`,
+        error: `صيغة الصورة غير متوقعة (النوع المستلم: ${typeof imageBase64}).`,
       });
     }
 
@@ -37,11 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const resolvedMimeType =
       mimeType || (imageBase64 && typeof imageBase64 === 'object' ? imageBase64.mimeType : null) || 'image/jpeg';
 
-    // 1. تحليل وفحص الصورة (استخدام gemini-3.5-flash للتوفير والأداء العالي)
+    // 1. تحليل وفحص الصورة
     if (action === 'analyze') {
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-1.5-flash',
           contents: [
             { inlineData: { data: cleanBase64, mimeType: resolvedMimeType } },
             { text: prompt || 'قم بتحليل تصميم هذه المجوهرات واستخراج وصف دقيق.' },
@@ -49,19 +47,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         return res.status(200).json({ result: response.text });
       } catch (analyzeError: any) {
-        // نموذج احتياطي في حالة حدوث إجهاد للكوتا (Fallback)
-        const fallbackResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: [
-            { inlineData: { data: cleanBase64, mimeType: resolvedMimeType } },
-            { text: prompt || 'قم بتحليل تصميم هذه المجوهرات واستخراج وصف دقيق.' },
-          ],
+        console.error('Analyze error:', analyzeError);
+        return res.status(502).json({
+          error: analyzeError.message || 'فشل تحليل الصورة.',
         });
-        return res.status(200).json({ result: fallbackResponse.text });
       }
     }
 
-    // 2. توليد صورة تسويقية (استخدام gemini-3.1-flash-image "Nano Banana 2")
+    // 2. توليد صورة تسويقية
     if (action === 'generate') {
       if (!cleanBase64) {
         return res.status(400).json({ error: 'لم يتم إرسال صورة (imageBase64 مفقود).' });
@@ -74,26 +67,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-3.1-flash-image',
+          model: 'gemini-2.5-flash', // أو النموذج المخصص لتوليد الصور المتوفر في حسابك
           contents,
           config: { responseModalities: ['IMAGE'] },
         });
         return res.status(200).json({ result: response });
       } catch (genError: any) {
-        console.error('Image generation failed with gemini-3.1-flash-image, retrying with 2.5:', genError);
-        try {
-          // نموذج احتياطي لتوليد الصور
-          const fallbackGenResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents,
-            config: { responseModalities: ['IMAGE'] },
-          });
-          return res.status(200).json({ result: fallbackGenResponse });
-        } catch (fallbackError: any) {
-          return res.status(502).json({
-            error: fallbackError.message || 'فشل توليد الصورة من Gemini.',
-          });
-        }
+        console.error('Image generation failed:', genError);
+        return res.status(502).json({
+          error: genError.message || 'فشل توليد الصورة.',
+        });
       }
     }
 
