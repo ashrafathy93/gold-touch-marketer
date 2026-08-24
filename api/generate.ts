@@ -35,11 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const resolvedMimeType =
       mimeType || (imageBase64 && typeof imageBase64 === 'object' ? imageBase64.mimeType : null) || 'image/jpeg';
 
-    // 1. تحليل وفحص الصورة
+    // 1. تحليل وفحص الصورة (تم التحديث بناءً على طلب جوجل إلى gemini-3.6-flash)
     if (action === 'analyze') {
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-1.5-flash',
+          model: 'gemini-3.6-flash',
           contents: [
             { inlineData: { data: cleanBase64, mimeType: resolvedMimeType } },
             { text: prompt || 'قم بتحليل تصميم هذه المجوهرات واستخراج وصف دقيق.' },
@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       try {
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash', // أو النموذج المخصص لتوليد الصور المتوفر في حسابك
+          model: 'gemini-3.1-flash-image', // أو gemini-3.6-flash حسب المتاح لتوليد الصور في حسابك
           contents,
           config: { responseModalities: ['IMAGE'] },
         });
